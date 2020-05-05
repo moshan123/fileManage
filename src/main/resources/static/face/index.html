@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" type="text/css" href="../themes/bootstrap/easyui.css" />
+    <link rel="stylesheet" type="text/css" href="../themes/icon.css" />
+    <link rel="stylesheet" type="text/css" href="../themes/color.css" />
+    <link rel="stylesheet" type="text/css" href="css/common.css" />
+    <link rel="stylesheet" type="text/css" href="webuploader.css" />
+    <script type="text/javascript" src="../jquery.min.js" ></script>
+    <script type="text/javascript" src="webuploader.js" ></script>
+
+    <script type="text/javascript" src="../jquery.easyui.min.js" ></script>
+    <script type="text/javascript" src="../locale/easyui-lang-zh_CN.js" ></script>
+    <script type="text/javascript" src="js/index.js"></script>
+    <script type="text/javascript" src="js/common.js"></script>
+    <title>非遗影像数据管理系统</title>
+</head>
+<body class="wh100 ft14">
+<h1 class="lh60" style="text-indent: 35px;">非遗影像数据管理系统</h1>
+
+<div id="userTable" class="easyui-layout">
+    <input id="folderId" type="hidden" />
+    <div data-options="region:'west',title:'文件目录',split:true,collapsible:false" style="width:18%; padding:5px">
+        <div class="common-con">
+            <div class="common-btn">
+                <a id="btnaddfolder"   class="easyui-linkbutton btn-default" onclick="openFolderDia('add')">新增</a>
+                <a id="btndelfolder"   class="easyui-linkbutton btn-default" onclick="delFile('folder')">删除</a>
+                <a id="btnupdfolder"   class="easyui-linkbutton btn-default" onclick="openFolderDia('upd')">修改</a>
+            </div>
+        </div>
+            <ul id="folderList" style="margin-top: 16px;box-shadow: 1px 0 5px #ccc;height: 100%"></ul>
+    </div>
+    <div data-options="region:'center',title:'文件'" style="padding:5px;">
+        <div class="common-con">
+            <form id="queryform">
+                <div class="common-each fl">
+                    <label class="ft14">文件类型：</label> <input id="type"  class="easyui-combobox" >
+                </div>
+                <div class="common-each fl">
+                    <label class="ft14">文件名称：</label> <input id="name"  class="easyui-textbox">
+                </div>
+                <div class="common-each fl" id="dbStat">
+                    <label class="ft14">文件路径：</label> <input id="path"  class="easyui-textbox"  >
+                </div>
+            </form>
+            <div class="common-buttoncon fr">
+                <a class="easyui-linkbutton btn-default btn-primary" onclick=" query_tabledata(defaultPageSize, defaultPageIndex, getPid())">查询</a>
+                <a class="reset easyui-linkbutton">重置</a>
+            </div>
+        </div>
+        <div style="width:100%; background-color: white; box-sizing:border-box; margin-top:16px; box-shadow:1px 0 5px #ccc">
+            <div class="common-btn">
+                <a id="btnadd"  class="easyui-linkbutton btn-default" onclick="openFileDia('add')">新增</a>
+                <a id="btnedit"   class="easyui-linkbutton btn-default" onclick="">修改</a>
+                <a id="btndelete"  class="easyui-linkbutton btn-default" onclick="delFile('file')">删除</a>
+            </div>
+
+            <p class="ft14 tips_path">
+                当前文件夹所在位置&nbsp;:&nbsp;&nbsp;&nbsp;
+                <a id="text_path" href='javascript:void(0)'  style='color:blue' ></a>
+            </p>
+            <table id="dgFile"></table>
+        </div>
+    </div>
+</div>
+<div id="dialog-addFolder" class="easyui-dialog" title="新增文件夹" style="width:50%;height:58%;"
+     data-options="resizable:true,modal:true,closed:true">
+    <div style="higth:100%;width:100% ;" >
+        <form id="swich">
+            <ul id="sp" class="ft14" style="text-align: center;">
+                <li >文件名称<span class="cr">*</span>&nbsp;：&nbsp;
+                    <input id="folderName" class="easyui-textbox"  data-options="width:250,required:true" />
+                </li>
+                <li id ="li_filePath">文件地址<span class="cr">*</span>&nbsp;：&nbsp;
+                    <input id="folderPath" class="easyui-textbox" data-options="width:250,required:true "/>
+                </li>
+                <li><a id="confirm" class="easyui-linkbutton btn-default" onclick="add('folder')">确定</a>
+                    <a id="cancel" class=" easyui-linkbutton btn-default" onclick="closeFolderDia()">取消</a>
+                </li>
+            </ul>
+        </form>
+    </div>
+</div>
+<div id="dialog-file" class="easyui-dialog" title="维护文件" style="width:80%;height:75%;"
+     data-options="resizable:true,modal:true,closed:true">
+    <p class="lh60" style="padding-left: 5%;">
+        <a id="picker" class="easyui-linkbutton btn-warning " >选择文件</a>
+        <a id="ctlBtn" class="easyui-linkbutton btn-default" onclick="saveFile()">确定上传</a>
+    </p>
+        <table id = "dgUpload"></table>
+</div>
+</body>
+<script>
+
+
+$(function () {
+
+    $("#name").textbox({
+        width:170,
+        height:30,
+        prompt:'请输入文件名称'
+    });
+    $(".reset").click(function() {
+        $("#queryform").form("reset");
+    });
+    $("#path").textbox({
+        width:170,
+        height:30,
+        prompt:'请输入文件路径'
+    });
+    $('#type').combobox({
+        width : 170,
+        height : 30,
+        panelHeight : 'auto',
+        valueField : 'typeCode',
+        textField : 'typeName',
+        editable : false,
+        prompt : '请输选择文件类型',
+        data : [
+                {"typeCode":"tp_folder","typeName":"文件夹"},
+                {"typeCode":"tp_picture","typeName":"图片"},
+                {"typeCode":"tp_video","typeName":"视频"},
+                {"typeCode":"tp_document","typeName":"文档"},
+        ]
+    });
+    $('#dgUpload').datagrid({
+        width : '100%',
+        height : '80%',
+        fitColumns : false,
+        pagination : false,
+        columns:[[
+            {
+                field : 'checkbox',
+                checkbox : "true",
+            },
+            {
+                field : 'id',
+                title : 'id',
+                align : 'center',
+                hidden : true,
+            },
+            {
+                field : 'pId',
+                title : '父ID',
+                align : 'center',
+                hidden : true,
+            },
+            {
+                field : 'xh',
+                title : '序号',
+                align : 'center',
+                width : '3%',
+                formatter : function(value, rowData, rowIndex) {
+                    return ++rowIndex;
+                }
+            },
+            {
+                field:'name',
+                title:'名称',
+                width:'15%',
+                align:'center'
+            },
+            {
+                field:'typeName',
+                title:'类型',
+                width:'10%',
+                align:'center',
+                formatter : function(value, row, index) {
+                    if(row['name'] != null && row['name']!= null){
+                        var x =row['name'].substr(row['name'].lastIndexOf(".")+1);
+                        if(x == 'png' || x == "jpg" ){
+                            row["typeName"] = "图片";
+                            return "图片";
+                        }else if(x == 'mp3' || x == "mp4" ){
+                            row["typeName"] = "音频";
+                            return "音频";
+                        }else{
+                            row["typeName"] = '文档';
+                            return "文档";
+                        }
+                    }
+                }
+            },
+            {
+                field:'typeCode',
+                title:'类型编码',
+                align:'center',
+                hidden : true,
+                formatter : function(value, row, index) {
+                    if(row['name'] != null && row['name']!= null){
+                        var x =row['name'].substr(row['name'].lastIndexOf(".")+1);
+                        if(x == 'png' || x == "jpg" ){
+                            row["typeCode"] = "tp_picture";
+                            return "tp_picture";
+                        }else if(x == 'mp3' || x == "mp4" ){
+                            row["typeCode"] = "tp_video";
+                            return "tp_video";
+                        }else{
+                            row["typeCode"] = "tp_document";
+                            return "tp_document";
+                        }
+                    }
+                }
+            },
+            {
+                field:'path',
+                title:'路径地址',
+                width:'32%',
+                align:'center',
+                formatter : function(value, row, index) {
+                     return getPath() + value;
+                }
+            },
+            {
+                field:'fileSize',
+                title:'文件大小',
+                width:'5%',
+                align:'center'
+            },
+            {
+                field:'createTime',
+                title:'录入时间',
+                width:'17%',
+                align:'center'
+            },
+            {
+                field:'remarks',
+                title:'备注',
+                width:'20%',
+                align:'center'
+            }
+        ]]
+    });
+
+    $('#dgFile').datagrid({
+        width : '100%',
+        height : $(window).height() - 250,
+        fitColumns : true,
+        pagination : true,
+        pageSize: defaultPageSize,
+        pageList: defaultPageList,
+        columns:[[
+            {
+                field : 'checkbox',
+                checkbox : "true",
+            },
+            {
+                field : 'id',
+                title : 'id',
+                align : 'center',
+                hidden : true,
+            },
+            {
+                field : 'pId',
+                title : '父ID',
+                align : 'center',
+                hidden : true,
+            },
+            {
+                field : 'xh',
+                title : '序号',
+                align : 'center',
+                width : '3%',
+                formatter : function(value, rowData, rowIndex) {
+                    return ++rowIndex;
+                }
+            },
+            {
+                field:'name',
+                title:'名称',
+                width:'15%',
+                align:'center'
+            },
+            {
+                field:'typeName',
+                title:'类型',
+                width:'10%',
+                align:'center'
+            },
+            {
+                field:'path',
+                title:'路径地址',
+                width:'32%',
+                align:'center',
+                formatter : function(value, row, index) {
+
+                    if(value != null){
+                        return " <a  href='javascript:void(0)' style='color:blue' onclick=\"getDg_Path('" + index+"')\" >" + value + "</a>";
+                    }
+                }
+            },
+            {
+                field:'fileSize',
+                title:'文件大小',
+                width:'5%',
+                align:'center'
+            },
+            {
+                field:'createTime',
+                title:'录入时间',
+                width:'17%',
+                align:'center'
+            },
+            {
+                field:'remarks',
+                title:'备注',
+                width:'20%',
+                align:'center'
+            }
+        ]]
+    });
+    //分页
+    $('#dgFile').datagrid("getPager").pagination({
+        onSelectPage : function(pageNumber, pageSize) {
+            query_tabledata(pageSize, pageNumber,getPid());
+            $('#dgFile').datagrid('loadData', tableData);
+        }
+    });
+    //query_tabledata(defaultPageSize, defaultPageIndex);
+    initTree();
+
+})
+
+</script>
+</html>

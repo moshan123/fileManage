@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.example.filemanage.dao.FileManageDao" >
+
+    <select id="queryInfo"  resultType="map">
+        SELECT
+            f.ID AS id,
+            f.PID AS pId,
+            f.`NAME` AS name,
+            f.TYPE_CODE AS typeCode,
+            t.`NAME` AS typeName,
+            f.PATH AS path,
+            f.FILESIZE AS fileSize,
+            f.REMARKS as remarks,
+            date_format( f.CREATE_TIME, '%Y-%m-%d %h:%i:%s %p') AS createTime
+        FROM
+            ts_file_info f
+        LEFT JOIN tr_type t ON f.TYPE_CODE = t.`CODE`
+        WHERE
+          f.TYPE_CODE != 'tp_folder'
+        <if test="pId != null and pId != ''">
+            AND  f.PID = #{pId}
+        </if>
+        <if test="typeCode != null and typeCode != ''">
+            AND f.TYPE_CODE = #{typeCode}
+        </if>
+        <if test="name != null and name != ''">
+            AND f.`NAME`  like '%${name}%'
+        </if>
+        <if test="path != null and path != ''">
+            AND f.`PATH`  like '%${path}%'
+        </if>
+        ORDER BY f.CREATE_TIME DESC
+        <if test="offset != null and pageSize != null">
+            LIMIT #{offset},#{pageSize}
+        </if>
+    </select>
+    <select id="queryTotal"  resultType="int">
+        SELECT
+            count(0)
+        FROM
+            ts_file_info f
+        LEFT JOIN
+            tr_type t ON f.TYPE_CODE = t.`CODE`
+        WHERE
+        f.TYPE_CODE != 'tp_folder'
+        <if test="pId != null and pId != ''">
+            AND  f.PID = #{pId}
+        </if>
+        <if test="typeCode != null and typeCode != ''">
+            AND f.TYPE_CODE = #{typeCode}
+        </if>
+        <if test="name != null and name != ''">
+            AND f.`NAME`  like '%${name}%'
+        </if>
+        <if test="path != null and path != ''">
+            AND f.`PATH`  like '%${path}%'
+        </if>
+    </select>
+    <select id="queryFolderList" parameterType="java.lang.String" resultType="map">
+        SELECT
+            f.ID AS id,
+            f.`NAME` AS text,
+            'closed' as state,
+            f.PATH as 'attributes'
+        FROM
+            ts_file_info f
+        LEFT JOIN tr_type t ON f.TYPE_CODE = t.`CODE`
+        WHERE
+        1=1
+            AND t.CODE = 'tp_folder'
+            <if test="pId != null and pId != ''">
+                AND  f.PID = #{pId}
+            </if>
+    </select>
+
+    <delete id="deleteChildren"  parameterType="java.lang.String">
+          delete from ts_file_info where PID = #{pId}
+    </delete>
+    <!-- 删除文件信息-->
+    <delete id="deleteByPrimaryKey" parameterType="java.lang.String" >
+            delete from ts_file_info where ID in
+            <foreach item="ids" collection="array" open="(" separator=","
+                     close=")">
+                #{ids}
+            </foreach>
+    </delete>
+    <!-- 新增文件信息-->
+    <insert id="insertFileInfo"  parameterType="java.util.List" >
+            INSERT INTO
+                ts_file_info(ID,PID, NAME, TYPE_CODE, PATH,CREATE_TIME,FILESIZE,REMARKS)
+            VALUES
+            <foreach collection="list" item="item" separator=",">
+                    (#{item.id,jdbcType=VARCHAR},
+                    #{item.pId,jdbcType=VARCHAR},
+                    #{item.name,jdbcType=VARCHAR},
+                    #{item.typeCode,jdbcType=VARCHAR},
+                    #{item.path,jdbcType=VARCHAR},
+                    #{item.createTime,jdbcType=TIMESTAMP},
+                    #{item.fileSize,jdbcType=VARCHAR},
+                    #{item.remarks,jdbcType=VARCHAR})
+            </foreach>
+    </insert>
+    <!-- 更新文件信息-->
+    <update id="updateFileInfo"  >
+        update ts_file_info
+        <set >
+            <if test="pid != null and pid != '' " >
+                PID = #{pid,jdbcType=VARCHAR},
+            </if>
+            <if test="name != null and name != ''" >
+                NAME = #{name,jdbcType=VARCHAR},
+            </if>
+            <if test="typeCode != null and typeCode != ''" >
+                TYPE_CODE = #{typeCode,jdbcType=VARCHAR},
+            </if>
+            <if test="path != null and path != ''" >
+                PATH = #{path,jdbcType=VARCHAR},
+            </if>
+            <if test="createTime != null and createTime != ''" >
+                CREATE_TIME = #{createTime,jdbcType=TIMESTAMP},
+            </if>
+            <if test="remarks != null" >
+                REMARKS = #{remarks,jdbcType=VARCHAR},
+            </if>
+        </set>
+        where ID = #{id,jdbcType=VARCHAR}
+    </update>
+</mapper>
