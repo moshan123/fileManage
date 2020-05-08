@@ -94,13 +94,12 @@ function timestampToTime(timestamp) {
     strDate = Y+M+D+h+m+s;
     return strDate;
 }
-//单位换算
+//文件大小单位换算
 function unitConvert(size){
-    if(size < 1024)
-    {
-        return size = size +"KB";
+    if (size > 1024 * 1024) {
+        return  size = (Math.round(size * 100 / (1024 * 1024)) / 100).toString() + 'MB';
     } else {
-        return size = eval(  size/ 1024).toFixed(2)+"MB";
+        return size = (Math.round(size * 100 / 1024) / 100).toString() + 'KB';
     }
 }
 
