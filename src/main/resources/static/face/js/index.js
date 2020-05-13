@@ -11,6 +11,8 @@ var uploader = null;
 var parentId = null;
 var parentPath = null;
 var treeData = null;
+//根节点路径
+var rootNodePath = null;
 /*查询表格数据*/
 function query_tabledata(pageSize, pageIndex, pId) {
     var typeCode = $("#type").val();
@@ -48,6 +50,7 @@ function initTree(){
         async : false,
         success : function(data) {
             treeData = data;
+            rootNodePath = data[0].attributes;
         }
     });
 
@@ -60,7 +63,12 @@ function initTree(){
         onClick:function(node){
             $("#folderId").val(node.id);
             $("#text_path").attr("onclick","openLocalFile(getPath())");
-            $("#text_path").text(getPath());
+            if(node.attributes != rootNodePath){
+                $("#text_path").text(rootNodePath + getPath());
+            } else {
+                $("#text_path").text( getPath());
+            }
+
             initFileDatagrid(node.id);
         }
     });
