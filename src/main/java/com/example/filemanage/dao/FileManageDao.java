@@ -55,4 +55,6 @@ public interface FileManageDao {
      * @param map
      */
     void updateFileInfo(Map<String, Object> map);
+
+
 }

@@ -105,4 +105,46 @@ public class FileUtil {
 			}
 		}
 	}
+	//
+
+	/**
+	 * 删除文件夹或者文件（只适用于windows）
+	 * @param  path 文件路径
+	 * @return
+	 */
+	public static boolean delete(String path){
+		File file = new File(path);
+		if(!file.exists()){
+			return false;
+		}
+		if(file.isFile()){
+			return file.delete();
+		}
+		File[] files = file.listFiles();
+		for (File f : files) {
+			if(f.isFile()){
+				if(!f.delete()){
+					System.out.println(f.getAbsolutePath()+" delete error!");
+					return false;
+				}
+			}else{
+				if(!delete(f.getAbsolutePath())){
+					return false;
+				}
+			}
+		}
+		return file.delete();
+	}
+
+	/**
+	 * 创建文件夹
+	 * @param path 文件夹地址
+	 */
+	public static void createFolder(String path){
+		File file = new File(path);
+		//如果路径不存在，新建
+		if(!file.exists()&&!file.isDirectory()) {
+			file.mkdirs();
+		}
+	}
 }

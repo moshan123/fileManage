@@ -13,6 +13,35 @@ var parentPath = null;
 var treeData = null;
 //根节点路径
 var rootNodePath = null;
+var $btn,
+    state = 'pending';
+//断点续传分片文件夹的key
+var md5File;
+//存入每个文件ID对应的md5File
+var fileArray = [];
+//更新按钮
+function getRowIndex(target){
+    var tr = $(target).closest('tr.datagrid-row');
+    return parseInt(tr.attr('datagrid-row-index'));
+}
+function editrow(target){
+    $('#dgUpload').datagrid('beginEdit', getRowIndex(target));
+}
+function deleterow(target){
+    $.messager.confirm('Confirm','Are you sure?',function(r){
+        if (r){
+            uploader.removeFile( $("#dgUpload").datagrid('getRows')[getRowIndex(target)].fileId, true);
+            $('#dgUpload').datagrid('deleteRow', getRowIndex(target));
+        }
+    });
+}
+function saverow(target){
+    $('#dgUpload').datagrid('endEdit', getRowIndex(target));
+}
+function cancelrow(target){
+    $('#dgUpload').datagrid('cancelEdit', getRowIndex(target));
+}
+
 /*查询表格数据*/
 function query_tabledata(pageSize, pageIndex, pId) {
     var typeCode = $("#type").val();
@@ -62,13 +91,13 @@ function initTree(){
         },
         onClick:function(node){
             $("#folderId").val(node.id);
-            $("#text_path").attr("onclick","openLocalFile(getPath())");
+
             if(node.attributes != rootNodePath){
                 $("#text_path").text(rootNodePath + getPath());
             } else {
                 $("#text_path").text( getPath());
             }
-
+            $("#text_path").attr("onclick","openLocalFile( $(\"#text_path\").text())");
             initFileDatagrid(node.id);
         }
     });
@@ -126,9 +155,6 @@ function openFolderDia(type){
             $("#confirm").attr('onclick', "upd('folder')");
         }
         $("#dialog-addFolder").dialog('open');
-
-
-
 }
 //关闭 新增文件夹 的弹框
 function closeFolderDia(){
@@ -183,21 +209,17 @@ function add(type){
     //添加文件
     if( type == "folder"){
         var folderName = $("#folderName").val();
-        var path = getPath()+ "\\" + folderName;
+        var path =  getPath()+ "\\" + folderName;
         data={
             typeCode : "tp_folder",
             name:folderName,
             path :path,
             flag : type,
-            pId : getPid()
+            pId : getPid(),
+            rootNodePath : rootNodePath
         };
     }else if(type == 'file'){
-        data={
-            typeCode : "tp_folder",
-            name:folderName,
-            path :path,
-            flag : type
-        };
+        //无
     }
     $.ajax({
         url : "/insertFileInfo",
@@ -223,20 +245,27 @@ function delFile(type){
     if(type == 'folder') {
         data = {
             ids : getPid(),
-            flag : 'folder'
+            flag : 'folder',
+            path :  rootNodePath + getPath()
         }
         msg = '您确认想要删除该文件夹吗？（删除该文件夹里面的文件一并删除）';
     }else if(type == "file"){
         var selectrows  = $("#dgFile").datagrid("getChecked");
         var ids = "";
+        var paths = [];
         if (selectrows.length > 0) {
             for (var i = 0; i < selectrows.length; i++) {
                  ids += selectrows[i].id+",";
+                 paths.push(selectrows[i].path);
             }
+        }else{
+            $.messager.alert('提示', '请选择你要删除的文件！', 'info');
+            return ;
         }
         data = {
             ids : ids,
-            flag :'file'
+            flag :'file',
+            paths :JSON.stringify(paths)
         }
         msg = '您确认想要删除该文件吗？';
     }
@@ -256,10 +285,10 @@ function delFile(type){
                     success : function(data) {
                         if(data.code == 0){
                             $.messager.alert('提示', '删除成功！', 'success');
-
                             if(type == 'folder'){
                                 query_tabledata(defaultPageSize, defaultPageIndex, getPid());
                                 $("#folderList").tree("reload", getParent(getSelected().target).target);
+                                $("#text_path").text("");
                             } else {
                                 query_tabledata(defaultPageSize, defaultPageIndex, getPid());
                             }
@@ -276,6 +305,7 @@ function delFile(type){
 }
 //打开维护文件的弹框
 function openFileDia(type){
+
     if(getPid() == null){
         $.messager.alert('提示', '请从文件目录中选择你要添加的文件夹！', 'info');
         return ;
@@ -287,63 +317,172 @@ function openFileDia(type){
     }else if(type == 'upd'){
         $("#dialog-file").dialog('open');
     }
+    $btn = $('#ctlBtn');
+    state = 'pending';
     initUpload();
+    $("#dgUpload").datagrid("loadData", { total: 0, rows: [] });
+    uploader.reset();
+
+
 }
 
 //初始化上传控件
 function initUpload(){
      uploader = WebUploader.create({
-        // swf文件路径
-        swf: 'Uploader.swf',
-        // 选择文件的按钮。可选。
-        // 内部根据当前运行是创建，可能是input元素，也可能是flash.
-        pick: '#picker',
-        // 不压缩image, 默认如果是jpeg，文件上传前会压缩一把再上传！
-        resize: false
+         // swf文件路径
+         swf: 'Uploader.swf',
+         server: '/upload',
+         // 内部根据当前运行是创建，可能是input元素，也可能是flash.
+         pick: '#picker',
+         // 不压缩image, 默认如果是jpeg，文件上传前会压缩一把再上传！
+         resize: false,
+         // 是否分块
+         chunked:true,
+         // 每块文件大小（默认5M）
+         chunkSize:10*1024*1024,
+         // 开启几个并非线程（默认3个）
+         threads:4,
+         // 在上传当前文件时，准备好下一个文件
+         prepareNextFile:true,
     });
     // 当有文件被添加进队列的时候
     uploader.on( 'fileQueued', function( file ) {
+       // $("#picker").hide();//隐藏上传框
         $('#dgUpload').datagrid('appendRow', {
             id : '',
             pId : parentId,
             name : file.name,
             typeName : '',
             typeCode : '',
-            path : parentPath+"\\" + file.name,
+            path : $("#text_path").text() + "\\" + file.name,
             fileSize : unitConvert(file.size),
             createTime : timestampToTime(new Date().getTime()),
-            remarks : ''
+            uploadState : '',
+            remarks : '',
+            fileId : file.id
         });
     });
-    // 文件上传过程中创建进度条实时显示。
-    uploader.on( 'uploadProgress', function( file, percentage ) {
-        var $li = $( '#'+file.id ),
-            $percent = $li.find('.progress .progress-bar');
-
-        // 避免重复创建
-        if ( !$percent.length ) {
-            $percent = $('<div class="progress progress-striped active">' +
-                '<div class="progress-bar" role="progressbar" style="width: 0%">' +
-                '</div>' +
-                '</div>').appendTo( $li ).find('.progress-bar');
+    uploader.on( 'all', function( type ) {
+        if ( type === 'startUpload' ) {
+            state = 'uploading';
+        } else if ( type === 'stopUpload' ) {
+            state = 'paused';
+        } else if ( type === 'uploadFinished' ) {
+            state = 'done';
         }
 
-        $li.find('p.state').text('上传中');
-
-        $percent.css( 'width', percentage * 100 + '%' );
+        if ( state === 'uploading' ) {
+            $btn.text('暂停上传！');
+        } else {
+            $btn.text('开始上传');
+        }
     });
-    uploader.on( 'uploadSuccess', function( file ) {
-        $( '#'+file.id ).find('p.state').text('已上传');
+
+    $btn.on( 'click', function() {
+        if ( state === 'uploading' ) {
+            uploader.stop();
+        } else {
+            uploader.upload();
+        }
     });
 
+    //上传添加参数
+    uploader.on('uploadBeforeSend', function (obj, data, headers) {
+        if (fileArray.length > 0) {
+            for (var i = 0; i < fileArray.length; i++) {
+                if (fileArray[i].filedId ==  obj.file.source.uid) {
+                    data.md5File = fileArray[i].md5File;
+                    data.path = $("#text_path").html();
+                    break;
+                }
+            }
+        }
+    });
+
+    //文件成功、失败处理
+    uploader.on('uploadSuccess', function (file) {
+        var chunksTotal = Math.ceil(file.size / (10*1024*1024));
+        if (chunksTotal >= 1) {
+            //合并请求
+            var deferred = WebUploader.Deferred();
+            var sucessMd5File;
+            if (fileArray.length > 0) {
+                for (var i = 0; i < fileArray.length; i++) {
+                    if (fileArray[i].filedId ==  file.source.uid) {
+                        sucessMd5File = fileArray[i].md5File;
+                        fileArray.splice(i, 1);
+                        break;
+                    }
+                }
+            }
+            var rows = [];
+            rows.push( getIndexOrRowsByFileId("dgUpload", file.id, "row"));
+            $.ajax({
+                type: "POST",
+                url: "/merge",
+                data: {
+                    name : file.name,
+                    md5File : sucessMd5File,
+                    chunks : chunksTotal,
+                    path : $("#text_path").html(),
+                    rows :  JSON.stringify(rows)
+                },
+                cache: false,
+                async: false,  // 同步
+                dataType: "json",
+                success:function(response){
+                    if(response){
+                        //$('#' + file.id).find('p.state').text('upload success');
+                        var rowIndes = getIndexOrRowsByFileId("dgUpload", file.id, "index");
+                        $('#dgUpload').datagrid('updateRow',{
+                            index: rowIndes,
+                            row: {
+                                uploadState : '上传成功！'
+                            }
+                        });
+                        //$('#' + file.id).find('.progress').fadeOut();
+                    }else{
+                        var rowIndes = getIndexOrRowsByFileId("dgUpload", file.id, "index");
+                        $('#dgUpload').datagrid('updateRow',{
+                            index: rowIndes,
+                            row: {
+                                uploadState : '上传失败！'
+                            }
+                        });
+                        //$('#' + file.id).find('p.state').text('merge error');
+                        deferred.reject();
+                    }
+                }
+            })
+            return deferred.promise();
+        }
+    });
     uploader.on( 'uploadError', function( file ) {
-        $( '#'+file.id ).find('p.state').text('上传出错');
+        var rowIndes = getIndexOrRowsByFileId("dgUpload", file.id, "index");
+        $('#dgUpload').datagrid('updateRow',{
+            index: rowIndes,
+            row: {
+                uploadState : "上传出错！"
+            }
+        });
     });
 
     uploader.on( 'uploadComplete', function( file ) {
-        $( '#'+file.id ).find('.progress').fadeOut();
+        //$( '#'+file.id ).find('.progress').fadeOut();
     });
-    initUpload = function () {};
+    // 文件上传过程中创建进度条实时显示。
+    uploader.on( 'uploadProgress', function( file, percentage ) {
+        var rows = $("#dgUpload").datagrid('getRows');
+        var rowIndes = getIndexOrRowsByFileId("dgUpload", file.id, "index");
+        $('#dgUpload').datagrid('updateRow',{
+            index: rowIndes,
+            row: {
+                uploadState : "上传中！",
+                status : (percentage * 100).toFixed(1)
+            }
+        });
+    });
+
 }
 //保存文件
 function saveFile(){
@@ -376,8 +515,4 @@ function saveFile(){
         }
     });
 }
-//递归获取文件路径
-function method(){
-        //获取父节点
-        //action
-}
+

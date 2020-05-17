@@ -9,7 +9,7 @@
     <link rel="stylesheet" type="text/css" href="webuploader.css" />
     <script type="text/javascript" src="../jquery.min.js" ></script>
     <script type="text/javascript" src="webuploader.js" ></script>
-
+    <script type="text/javascript" src="js/md5.js"></script>
     <script type="text/javascript" src="../jquery.easyui.min.js" ></script>
     <script type="text/javascript" src="../locale/easyui-lang-zh_CN.js" ></script>
     <script type="text/javascript" src="js/index.js"></script>
@@ -82,11 +82,13 @@
         </form>
     </div>
 </div>
-<div id="dialog-file" class="easyui-dialog" title="维护文件" style="width:80%;height:75%;"
+<div id="dialog-file" class="easyui-dialog" title="维护文件" style="width:95%;height:75%;"
      data-options="resizable:true,modal:true,closed:true">
     <p class="lh60" style="padding-left: 5%;">
         <a id="picker" class="easyui-linkbutton btn-warning " >选择文件</a>
-        <a id="ctlBtn" class="easyui-linkbutton btn-default" onclick="saveFile()">确定上传</a>
+
+        <button id="ctlBtn" class="easyui-linkbutton btn-default">开始上传</button>
+        <!--<a id="ctlBtn" class="easyui-linkbutton btn-default" onclick="saveFile()">确定上传</a>-->
     </p>
         <table id = "dgUpload"></table>
 </div>
@@ -95,7 +97,90 @@
 
 
 $(function () {
+    //监听分块上传过程中的时间点
+    WebUploader.Uploader.register({
+        "before-send-file":"beforeSendFile",  // 整个文件上传前
+        "before-send":"beforeSend",  // 每个分片上传前
+        "after-send-file": "afterSendFile"  // 分片上传完毕
+    },{
+        //时间点1：所有分块进行上传之前调用此函数 ，检查文件存不存在
+        beforeSendFile:function(file){
+            var deferred = WebUploader.Deferred();
+            md5File = hex_md5(file.name+file.size);//根据文件名称，大小确定文件唯一标记，这种方式不赞成使用
+            $.ajax({
+                type:"POST",
+                url:"/checkFile",
+                data:{
+                    md5File: md5File, //文件唯一标记
+                    path:$("#text_path").html() + "\\" + file.name //文件全路径
+                },
+                async: false,  // 同步
+                dataType:"json",
+                success:function(response){
+                    if(response){  //文件存在，跳过 ，提示文件存在
+                        $('#' + file.id).find('p.state').text("file exist");
 
+                        var rowIndes = getIndexOrRowsByFileId("dgUpload", file.id, "index");
+                        $('#dgUpload').datagrid('updateRow',{
+                            index: rowIndes,
+                            row: {
+                                uploadState : "文件已存在！"
+                            }
+                        });
+
+                        uploader.skipFile(file);
+                        state = "uploadFail";
+                        deferred.resolve();  //文件不存在或不完整，发送该文件
+                    }else{
+                        var paramOb = {"md5File": md5File, "filedId": file.source.uid};
+                        fileArray.push(paramOb);
+                        deferred.resolve();  //文件不存在或不完整，发送该文件
+                    }
+                }
+            } , function (jqXHR, textStatus, errorThrown) { //任何形式的验证失败，都触发重新上传
+                deferred.resolve();
+            } );
+            return deferred.promise();
+        },
+        //时间点2：如果有分块上传，则每个分块上传之前调用此函数  ，判断分块存不存在
+        beforeSend:function(block){
+            var deferred = WebUploader.Deferred();
+            var pratMd5File;
+            if (fileArray.length > 0) {
+                for (var i = 0; i < fileArray.length; i++) {
+                    if (fileArray[i].filedId == block.file.source.uid) {
+                        pratMd5File = fileArray[i].md5File;
+                        break;
+                    }
+                }
+            }
+            $.ajax({
+                type:"POST",
+                url:"/checkChunk",
+                data:{
+                    md5File: pratMd5File,  //文件唯一标记
+                    chunk:block.chunk,  //当前分块下标
+                    total: block.total, //文件的大小
+                    path:  $("#text_path").html()
+                },
+                async: false,  // 同步
+                dataType:"json",
+                success:function(response){
+                    if(response){
+                        deferred.reject(); //分片存在，跳过
+                    }else{
+                        deferred.resolve();  //分块不存在或不完整，重新发送该分块内容
+                    }
+                }
+            }, function (jqXHR, textStatus, errorThrown) { //任何形式的验证失败，都触发重新上传
+                deferred.resolve();
+            });
+            return deferred.promise();
+        },
+        //时间点3：分片上传完成后，通知后台合成分片
+        afterSendFile: function (file) {
+        }
+    });
     $("#name").textbox({
         width:170,
         height:30,
@@ -126,9 +211,10 @@ $(function () {
     });
     $('#dgUpload').datagrid({
         width : '100%',
-        height : '80%',
+        height : '90%',
         fitColumns : false,
         pagination : false,
+        rownumbers : true,
         columns:[[
             {
                 field : 'checkbox',
@@ -147,24 +233,15 @@ $(function () {
                 hidden : true,
             },
             {
-                field : 'xh',
-                title : '序号',
-                align : 'center',
-                width : '3%',
-                formatter : function(value, rowData, rowIndex) {
-                    return ++rowIndex;
-                }
-            },
-            {
                 field:'name',
                 title:'名称',
-                width:'15%',
+                width:'7%',
                 align:'center'
             },
             {
                 field:'typeName',
                 title:'类型',
-                width:'10%',
+                width:'3%',
                 align:'center',
                 formatter : function(value, row, index) {
                     if(row['name'] != null && row['name']!= null){
@@ -206,11 +283,8 @@ $(function () {
             {
                 field:'path',
                 title:'路径地址',
-                width:'32%',
-                align:'center',
-                formatter : function(value, row, index) {
-                     return getPath() + value;
-                }
+                width:'30%',
+                align:'center'
             },
             {
                 field:'fileSize',
@@ -221,16 +295,74 @@ $(function () {
             {
                 field:'createTime',
                 title:'录入时间',
-                width:'17%',
+                width:'10%',
                 align:'center'
             },
             {
                 field:'remarks',
                 title:'备注',
                 width:'20%',
-                align:'center'
+                align:'center',
+                editor:'text'
+            },
+            {
+                field:'uploadState',
+                title:'上传状态',
+                align:'center',
+                hidden : true,
+            },
+            {
+                field:'status',
+                title:'进度',
+                width:'15%',
+                align:'center',
+                formatter: function (value, row) {
+                    var text = "";
+                    if(isNaN(parseInt(value))){
+                        text = "等待上传..."
+                    }
+                    var htmlstr = '<div class="easyui-progressbar progressbar easyui-fluid" data-options="value:' + value + '" style="width: 100%; height: 22px;">' +
+                        '<div class="progressbar-text" style="width: 99%; height: 20px; line-height: 20px;">' + text + '</div>' +
+                        '<div class="progressbar-value" style="width: '+value+'%; height: 20px; line-height: 20px;">' +
+                        '<div class="progressbar-text" style="width: 99%; height: 20px; line-height: 20px;">' + value + '%</div></div></div><p>'+ row.uploadState + '</p>' ;
+                    return htmlstr;
+                }
+            },
+            {
+                field:'action',
+                title:'操作',
+                width:'5%',
+                align:'center',
+                formatter:function(value,row,index){
+                    if (row.editing){
+                        var s = '<a href="#"  style=\'color:blue\'  onclick="saverow(this)">保存</a> ';
+                        var c = '<a href="#"  style=\'color:blue\'  onclick="cancelrow(this)">取消</a>';
+                        return s+c;
+                    } else {
+                        var e = '<a href="#"  style=\'color:blue\'  onclick="editrow(this)">编辑</a> ';
+                        var d = '<a href="#"  style=\'color:blue\'  onclick="deleterow(this)">删除</a>';
+                        return e+d;
+                    }
+                }
             }
-        ]]
+        ]],
+        onEndEdit:function(index,row){
+            var ed = $(this).datagrid('getEditor', {
+                index: index
+            });
+        },
+        onBeforeEdit:function(index,row){
+            row.editing = true;
+            $(this).datagrid('refreshRow', index);
+        },
+        onAfterEdit:function(index,row){
+            row.editing = false;
+            $(this).datagrid('refreshRow', index);
+        },
+        onCancelEdit:function(index,row){
+            row.editing = false;
+            $(this).datagrid('refreshRow', index);
+        }
     });
 
     $('#dgFile').datagrid({
@@ -284,9 +416,10 @@ $(function () {
                 width:'32%',
                 align:'center',
                 formatter : function(value, row, index) {
-
                     if(value != null){
-                        return " <a  href='javascript:void(0)' style='color:blue' onclick=\"getDg_Path('" + index+"')\" >" + value + "</a>";
+                        value = rootNodePath+value;
+                        row["path"] = value;
+                        return " <a  href='javascript:void(0)' style='color:blue' onclick=\"getDg_Path('" + index+"')\" >" +value + "</a>";
                     }
                 }
             },

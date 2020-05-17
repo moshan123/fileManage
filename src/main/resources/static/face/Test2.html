@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" type="text/css" href="webuploader.css" />
+    <script type="text/javascript" src="../jquery.min.js" ></script>
+    <script type="text/javascript" src="webuploader.js" ></script>
+    <title>Title</title>
+    <style type="text/css">
+        .wu-example {
+            width: 847px;
+
+            position: relative;
+            padding: 45px 15px 15px;
+            margin: 0 auto;
+            background-color: #fafafa;
+            box-shadow: inset 0 3px 6px rgba(0, 0, 0, .05);
+            border-color: #e5e5e5 #eee #eee;
+            border-style: solid;
+            border-width: 1px 0;
+        }
+
+        #picker {
+            display: inline-block;
+            line-height: 1.428571429;
+            vertical-align: middle;
+            margin: 0 12px 0 0;
+        }
+
+
+    </style>
+</head>
+<div class="alert alert-success" role="alert" style="text-align: center;font-size: 18px;">隔离交换系统可视化解密</div>
+
+<div id="uploader" class="wu-example">
+    <!-- 用于显示文件列表 -->
+    <div id="fileList"></div>
+    <div class="btns">
+        <div id="picker">选择文件</div>
+        <button id="ctlBtn" class="btn btn-default">开始上传</button>
+    </div>
+    <p>
+        <span>上传所用时间:</span>
+        <span id="useTime">0</span>
+    </p>
+</div>
+
+
+<script type="text/javascript">
+    var $list = $("#fileList");
+    var $btn = $("#ctlBtn");
+    var state = 'pending'; // 上传文件初始化
+    var timer;
+    var fileArray = [];
+
+    var uploader = WebUploader.create({
+
+        // swf文件路径
+        swf: 'Uploader.swf',
+
+        // 文件接收服务端。
+        server: '/upload',
+
+        // 选择文件的按钮。可选。
+        // 内部根据当前运行是创建，可能是input元素，也可能是flash.
+        pick: '#picker',
+
+        // 不压缩image, 默认如果是jpeg，文件上传前会压缩一把再上传！
+        resize: false,
+        duplicate: true,
+        chunked: true,
+        threads: 5,
+        chunkSize: 10*1024*1024,
+        formData: {
+            guid: ""
+        },
+        // 在上传当前文件时，准备好下一个文件
+        prepareNextFile:true
+    });
+
+    //点击上传之前调用的方法
+    uploader.on("uploadStart", function (file) {
+        var guid = WebUploader.Base.guid();
+        var paramOb = {"guid": guid, "filedId": file.source.ruid}
+        uploader.options.formData.guid = guid;
+        fileArray.push(paramOb);
+    });
+
+
+    // 生成缩略图和上传进度
+    uploader.on("fileQueued", function(file) {
+            // 把文件信息追加到fileList的div中
+            $("#fileList").append("<div id='" + file.id + "'><img/><span>" + file.name + "</span><div><span class='state'></span></div><div><span class='percentage'></span></div></div>");
+
+            // 制作缩略图
+            // error：不是图片，则有error
+            // src:代表生成缩略图的地址
+            uploader.makeThumb(file, function(error, src) {
+                if (error) {
+                    $("#" + file.id).find("img").replaceWith("<span>无法预览&nbsp;</span>");
+                } else {
+                    $("#" + file.id).find("img").attr("src", src);
+                }
+            });
+        }
+    );
+
+    // 监控上传进度
+    // percentage:代表上传文件的百分比
+    uploader.on("uploadProgress", function(file, percentage) {
+        $("#" + file.id).find("span.percentage").text(Math.round(percentage * 100) + "%");
+    });
+
+    //文件成功、失败处理
+    uploader.on('uploadSuccess', function (file) {
+        var successFileId = file.source.ruid;
+        var successDuid;
+        if (fileArray.length > 0) {
+            for (var i = 0; i < fileArray.length; i++) {
+                if (fileArray[i].filedId === successFileId) {
+                    successDuid=fileArray[i].guid;
+                    fileArray.splice(i, 1);
+                }
+            }
+        }
+        clearInterval(timer);
+        $('#' + file.id).find('p.state').text('已上传');
+        $.get("/merge",
+            {"guid": successDuid},
+            function (data, status) {
+
+
+        });
+
+    });
+
+    uploader.on('uploadError', function (file) {
+        $('#' + file.id).find('p.state').text('上传出错');
+    });
+
+    uploader.on('uploadComplete', function (file) {
+        $('#' + file.id).find('.progress').fadeOut();
+    });
+
+    $btn.on('click', function () {
+        if (state === 'uploading') {
+            uploader.stop();
+        } else {
+            uploader.upload();
+            timer = setInterval(function () {
+                var useTime = parseInt($("#useTime").html());
+                useTime = useTime + 1;
+                $("#useTime").html(useTime);
+            }, 1000);
+        }
+    });
+
+
+</script>
+</body>
+</html>

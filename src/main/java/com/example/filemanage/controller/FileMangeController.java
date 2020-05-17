@@ -1,26 +1,34 @@
 package com.example.filemanage.controller;
 
+import cn.hutool.core.io.FileUtil;
+import cn.hutool.http.HttpUtil;
 import com.example.filemanage.dao.FileManageDao;
 import com.example.filemanage.service.IFileManage;
 import com.example.filemanage.util.R;
 import com.example.filemanage.util.page.ChangePage;
+import org.apache.commons.fileupload.FileItem;
+import org.apache.commons.fileupload.disk.DiskFileItemFactory;
+import org.apache.commons.fileupload.servlet.ServletFileUpload;
+import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.multipart.support.StandardMultipartHttpServletRequest;
 
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
-import java.io.File;
-import java.io.IOException;
+import javax.servlet.http.HttpServletResponse;
+import java.io.*;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.nio.channels.FileChannel;
+import java.util.*;
 
 
 @RestController
@@ -143,6 +151,7 @@ public class FileMangeController  {
     }
     @RequestMapping( value = "updateFileInfo")
     public R  updateFileInfo(@RequestParam Map<String , Object> map){
+
         try {
             ifileManage.updateFileInfo(map);
         }catch (Exception e){
@@ -155,6 +164,234 @@ public class FileMangeController  {
 
     }
 
+    /**
+     * 文件上传
+     * @param request
+     * @throws Exception
+     */
+   /* @RequestMapping(value = "/upload")
+    public void upload(HttpServletRequest request){
+        try {
+            ifileManage.upload(request);
+        }catch (Exception e){
+            log.error("上传文件出错!");
+            e.printStackTrace();
+        }
 
+    }*/
+
+    /**
+     * 文件下载相关代码
+     * @param response
+     */
+    @RequestMapping("/download")
+    public void download( HttpServletResponse response){
+        try {
+            ifileManage.download(response);
+        }catch (Exception e){
+            e.printStackTrace();
+            log.error("下载失败！");
+        }
+
+    }
+
+
+    /**********************************************************写法2***************************************************************/
+    /*private static String FILENAME = "";
+
+
+    //@Value("${xdja.upload.file.path}")
+    private String decryptFilePath ="E:\\非遗影像数据库";
+
+   // @Value("${xdja.upload.file.path.temp}")
+    private String decryptFilePathTemp="E:\\临时文件夹";
+
+    @GetMapping("/webuploader")
+    public String webuploader() {
+        return "webupload";
+    }*/
+
+    /**
+     * 分片上传
+     *
+     * @return ResponseEntity<Void>
+     */
+   /* @PostMapping("/upload")
+    @ResponseBody
+    public R decrypt(HttpServletRequest request, @RequestParam(value = "file", required = false) MultipartFile file,
+                     Integer chunks, Integer chunk, String name, String guid)  {
+        try{
+            boolean isMultipart = ServletFileUpload.isMultipartContent(request);
+            if (isMultipart) {
+                if (file == null) {
+                    //throw new ServiceException(ExceptionEnum.PARAMS_VALIDATE_FAIL);
+                    throw new RuntimeException("error");
+                }
+                log.info("guid:" + guid);
+                if (chunks == null && chunk == null) {
+                    chunk = 0;
+                }
+                File outFile = new File(decryptFilePathTemp+File.separator+guid, chunk + ".part");
+                if ("".equals(FILENAME)) {
+                    FILENAME = name;
+                }
+                InputStream inputStream = file.getInputStream();
+                FileUtils.copyInputStreamToFile(inputStream, outFile);
+            }
+            return R.ok();
+        }catch (Exception e){
+            log.error("上传失败！");
+            e.printStackTrace();
+            return R.error(e.getMessage());
+        }
+
+    }*/
+
+    /**
+     * 合并所有分片
+     *
+     * @throws Exception Exception
+     */
+   /* @GetMapping("/merge")
+    @ResponseBody
+    public R byteMergeAll(String guid)  {
+        try{
+            log.info("merge:"+guid);
+            File file = new File(decryptFilePathTemp+File.separator+guid);
+            if (file.isDirectory()) {
+                File[] files = file.listFiles();
+                if (files != null && files.length > 0) {
+                    File partFile = new File(decryptFilePath + File.separator + FILENAME);
+                    for (int i = 0; i < files.length; i++) {
+                        File s = new File(decryptFilePathTemp+File.separator+guid, i + ".part");
+                        FileOutputStream destTempfos = new FileOutputStream(partFile, true);
+                        FileUtils.copyFile(s, destTempfos);
+                        destTempfos.close();
+                    }
+                    FileUtils.deleteDirectory(file);
+                    FILENAME = "";
+                }
+            }
+        }catch (Exception e){
+            log.error("合并失败");
+            e.printStackTrace();
+            return R.error(e.getMessage());
+        }
+        return R.ok();
+
+    }*/
+
+    /***************************************************写法3********************************************/
+    /**
+     * @author van
+     * 检查文件存在与否
+     */
+    @PostMapping("checkFile")
+    @ResponseBody
+    public Boolean checkFile(@RequestParam(value = "md5File") String md5File, @RequestParam(value = "path") String path) {
+        Boolean exist = false;
+        File file = new File(path);
+        if(file.exists())
+           exist = true;
+        //实际项目中，这个md5File唯一值，应该保存到数据库或者缓存中，通过判断唯一值存不存在，来判断文件存不存在，这里我就不演示了
+		/*if(true) {
+			exist = true;
+		}*/
+        return exist;
+    }
+
+    /**
+     * @author van
+     * 检查分片存在与否
+     */
+    @PostMapping("checkChunk")
+    @ResponseBody
+    public Boolean checkChunk(@RequestParam(value = "md5File") String md5File,
+                              @RequestParam(value = "chunk") Integer chunk,
+                              @RequestParam(value = "path") String path,
+                              @RequestParam(value = "total") Integer total) {
+        Boolean exist = false;
+        path = path + File.separator + md5File ;//分片存放目录
+        String chunkName = chunk+ ".tmp";//分片名
+        File file = new File(path+File.separator+chunkName);
+        // 判断存在的同时应该判断下大小是否一致
+        if (file.exists() ) {
+            exist = true;
+        }
+        return exist;
+    }
+
+    /**
+     * @author van
+     * 上传，这里根据文件md5值生成目录，并将分片文件放到该目录下
+     */
+    @PostMapping("upload")
+    @ResponseBody
+    public Boolean upload(@RequestParam(value = "file") MultipartFile file,
+                          @RequestParam(value = "md5File") String md5File,
+                          @RequestParam(value = "path") String path,
+                          @RequestParam(value = "chunk",required= false) Integer chunk) { //第几片，从0开始
+        path = path + File.separator + md5File + File.separator;
+        File dirfile = new File(path);
+        if (!dirfile.exists()) {//目录不存在，创建目录
+            dirfile.mkdirs();
+        }
+        String chunkName;
+        if(chunk == null) {//表示是小文件，还没有一片
+            chunkName = "0.tmp";
+        }else {
+            chunkName = chunk+ ".tmp";
+        }
+        String filePath = path+chunkName;
+        File savefile = new File(filePath);
+
+        try {
+            if (!savefile.exists()) {
+                savefile.createNewFile();//文件不存在，则创建
+            }
+            file.transferTo(savefile);//将文件保存
+        } catch (IOException e) {
+            e.printStackTrace();
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * @author van
+     * 合成分片
+     */
+    @PostMapping("merge")
+    @ResponseBody
+    public Boolean merge(@RequestParam(value = "chunks",required =false) Integer chunks,
+                          @RequestParam(value = "md5File") String md5File,
+                          @RequestParam(value = "path") String path,
+                          @RequestParam(value = "name") String name,
+                          @RequestParam Map<String , Object> map) throws Exception {
+        FileOutputStream fileOutputStream = new FileOutputStream(path + File.separator + name);  //合成后的文件
+        try {
+            byte[] buf = new byte[10*1024];
+            for(long i=0;i<chunks;i++) {
+                String chunkFile=i+".tmp";
+                File file = new File(path+"/"+md5File+"/"+chunkFile);
+                InputStream inputStream = new FileInputStream(file);
+                int len = 0;
+                while((len=inputStream.read(buf))!=-1){
+                    fileOutputStream.write(buf,0,len);
+                }
+                inputStream.close();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }finally {
+            //合并完，要删除md5目录及临时文件，节省空间。这里代码省略
+            File delFile = new File(path+"/"+md5File+"/");
+            FileUtils.deleteDirectory(delFile);
+            fileOutputStream.close();
+            ifileManage.insertFileInfo(map);
+        }
+        return true;
+    }
 
 }

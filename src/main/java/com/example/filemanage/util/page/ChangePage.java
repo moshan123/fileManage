@@ -1,7 +1,9 @@
 package com.example.filemanage.util.page;
 
-import java.util.Map;
 
+
+
+import java.util.*;
 
 
 /**
@@ -52,5 +54,8 @@ public  class ChangePage {
 		}
 		return true;
 	}
+
+
+
 
 }

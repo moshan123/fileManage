@@ -19,7 +19,7 @@
         WHERE
           f.TYPE_CODE != 'tp_folder'
         <if test="pId != null and pId != ''">
-            AND  f.PID = #{pId}
+            AND FIND_IN_SET(f.PID,selectChildByPid(#{pId}))
         </if>
         <if test="typeCode != null and typeCode != ''">
             AND f.TYPE_CODE = #{typeCode}
@@ -45,7 +45,7 @@
         WHERE
         f.TYPE_CODE != 'tp_folder'
         <if test="pId != null and pId != ''">
-            AND  f.PID = #{pId}
+            AND FIND_IN_SET(f.PID,selectChildByPid(#{pId}))
         </if>
         <if test="typeCode != null and typeCode != ''">
             AND f.TYPE_CODE = #{typeCode}

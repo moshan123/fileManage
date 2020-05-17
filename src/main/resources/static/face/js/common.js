@@ -49,13 +49,13 @@ function openLocalFile2(filename){
     }
 }
 //调用后台java代码打开文件
-function openLocalFile(filePath){
+function openLocalFile(path){
     $.ajax({
         url : "/openLocalFile",
         type : "post",
         dataType : 'json',
         async : true,
-        data : {filePath : filePath},
+        data : {filePath : path},
         success : function(data) {
             if(data.code != 0){
                 $.messager.alert('提示', data.msg, 'info');
@@ -113,4 +113,19 @@ function gotoPage(datagridId,tableData,methodName){
     $("#" + datagridId).datagrid('loadData', tableData);
     parent.$("#pageIndex").val(defaultPageIndex);
     parent.$("#pageSize").val(defaultPageSize);
+}
+//通过fileId 获取行的下表或者文件Rows
+function getIndexOrRowsByFileId(datagridId,fileId,flag){
+    var rows =  $("#" + datagridId).datagrid('getRows');
+    for (var i = 0; i < rows.length; i++){
+        if(rows[i].fileId == fileId){
+            if(flag == 'index'){
+                return i;
+            }else{
+                //flag == 'row'
+                return rows[i];
+            }
+
+        }
+    }
 }
