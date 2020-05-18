@@ -52,7 +52,7 @@
         <div style="width:100%; background-color: white; box-sizing:border-box; margin-top:16px; box-shadow:1px 0 5px #ccc">
             <div class="common-btn">
                 <a id="btnadd"  class="easyui-linkbutton btn-default" onclick="openFileDia('add')">新增</a>
-                <a id="btnedit"   class="easyui-linkbutton btn-default" onclick="">修改</a>
+                <a id="btnedit"   class="easyui-linkbutton btn-default" onclick="openEditFileDia()">修改</a>
                 <a id="btndelete"  class="easyui-linkbutton btn-default" onclick="delFile('file')">删除</a>
             </div>
 
@@ -91,6 +91,21 @@
         <!--<a id="ctlBtn" class="easyui-linkbutton btn-default" onclick="saveFile()">确定上传</a>-->
     </p>
         <table id = "dgUpload"></table>
+</div>
+<div id="dialog-editFile" class="easyui-dialog" title="修改文件备注" style="width:40%;height:40%;"
+     data-options="resizable:true,modal:true,closed:false">
+    <div style="higth:100%;width:100% ;" >
+        <form id="swich2">
+            <ul  class="ft14" style="text-align: center;margin-top: 10%;">
+                <li >备注：&nbsp;
+                    <input id="remarks" class="easyui-textbox" data-options="width:250,height:100,multiline:true "/>
+                </li>
+                <li style="margin: 8%"><a class="easyui-linkbutton btn-default" onclick="updateFile()">确定</a>
+                    <a class=" easyui-linkbutton btn-default" onclick="closeEditFileDia()">取消</a>
+                </li>
+            </ul>
+        </form>
+    </div>
 </div>
 </body>
 <script>
