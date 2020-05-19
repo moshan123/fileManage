@@ -6,6 +6,7 @@ import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.TypeReference;
 import com.example.filemanage.dao.FileManageDao;
 import com.example.filemanage.util.FileUtil;
+import org.apache.tomcat.util.buf.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -71,9 +72,15 @@ public class FileManageImpl implements IFileManage {
 
     @Override
     @Transactional(readOnly = false)
-    public void insertFileInfo(Map<String , Object> map) {
+    public void insertFileInfo(Map<String , Object> map) throws Exception {
         List<Map<String, Object>> list = new ArrayList<Map<String, Object>>();
         if("folder".equals(map.get("flag"))){
+            if(map.get("rootNodePath") != null &&  map.get("rootNodePath") != ""){
+                String path = map.get("path").toString();
+                int index = path.indexOf("\\");
+                index = path.indexOf("\\", index+1);
+                map.put("path", path.substring(index));
+            }
             map.put("id", FileUtil.newUUID());
             map.put("createTime" ,new Date());
             map.put("remarks", "");
@@ -96,7 +103,18 @@ public class FileManageImpl implements IFileManage {
         dao.insertFileInfo(list);
         //创建文件夹
         if("folder".equals(map.get("flag"))){
-            FileUtil.createFolder(map.get("rootNodePath").toString() + map.get("path").toString());
+            File file = new File(map.get("rootNodePath").toString());
+            if(!file.exists()  && !file .isDirectory()){
+                throw new Exception(map.get("rootNodePath").toString()+"文件夹不存在！");
+            }
+            File fileChiled = new File(map.get("rootNodePath").toString() + map.get("path").toString());
+            if  (fileChiled .exists()  && fileChiled .isDirectory()) {
+                throw new Exception(map.get("rootNodePath").toString() + map.get("path").toString()+
+                        "当前文件夹已存在！");
+            }
+                FileUtil.createFolder(map.get("rootNodePath").toString() + map.get("path").toString());
+
+
         }
     }
 

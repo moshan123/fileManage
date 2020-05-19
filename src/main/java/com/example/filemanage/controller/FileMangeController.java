@@ -143,7 +143,7 @@ public class FileMangeController  {
         }catch (Exception e){
             log.info("添加失败！");
             e.printStackTrace();
-            return R.error();
+            return R.error(e.getMessage());
         }
         log.info("添加成功！");
         return  R.ok();
@@ -151,13 +151,12 @@ public class FileMangeController  {
     }
     @RequestMapping( value = "updateFileInfo")
     public R  updateFileInfo(@RequestParam Map<String , Object> map){
-
         try {
             ifileManage.updateFileInfo(map);
         }catch (Exception e){
             log.info("更新失败！");
             e.printStackTrace();
-            return R.error();
+            return R.error(e.getMessage());
         }
         log.info("更新成功！");
         return  R.ok();

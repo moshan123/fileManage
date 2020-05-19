@@ -13,12 +13,11 @@ var parentPath = null;
 var treeData = null;
 //根节点路径
 var rootNodePath = null;
-var $btn,
-    state = 'pending';
+var state = 'pending';
 //断点续传分片文件夹的key
 var md5File;
 //存入每个文件ID对应的md5File
-var fileArray = [];
+var fileArray;
 //更新按钮
 function getRowIndex(target){
     var tr = $(target).closest('tr.datagrid-row');
@@ -168,7 +167,12 @@ function upd(type){
     if( type == "folder"){
         var folderName = $("#folderName").val();
         var path = getPath();
-        var realPath = path.substr(0, path.lastIndexOf("\\"))+"\\"+folderName;
+        var realPath ;
+        if(getName() == treeData[0].text){
+            realPath = $("#folderPath").val();
+        }else{
+            realPath = path.substr(0, path.lastIndexOf("\\"))+"\\"+folderName;
+        }
         data = {
             name : folderName,
             id : getPid(),
@@ -192,9 +196,12 @@ function upd(type){
             if(data.code == 0){
                 $.messager.alert('提示', '修改成功！', 'success');
                 $("#text_path").text(realPath);
-                $("#folderList").tree("reload", getParent(getSelected().target).target);
                 closeFolderDia();
-
+                if(getName() == treeData[0].text){
+                    initTree();
+                }else{
+                    $("#folderList").tree("reload", getParent(getSelected().target).target);
+                }
             }else{
                 $.messager.alert('提示', '修改失败！', 'error');
             }
@@ -205,7 +212,6 @@ function upd(type){
 //新增文件
 function add(type){
     var data = null;
-
     //添加文件
     if( type == "folder"){
         var folderName = $("#folderName").val();
@@ -233,7 +239,7 @@ function add(type){
                 $("#folderList").tree("reload", getSelected().target);
                 closeFolderDia();
             }else{
-                $.messager.alert('提示', '添加失败！', 'error');
+                $.messager.alert('提示', data.msg, 'error');
             }
         }
     });
@@ -317,17 +323,109 @@ function openFileDia(type){
     }else if(type == 'upd'){
         $("#dialog-file").dialog('open');
     }
-    $btn = $('#ctlBtn');
+    $(".panel-tool-close").attr("onclick",gotoPage('dgFile', tableData, query_tabledata));
     state = 'pending';
+    fileArray = [];
+
     initUpload();
     $("#dgUpload").datagrid("loadData", { total: 0, rows: [] });
     uploader.reset();
-
-
 }
-
+//开始上传按钮的点击事件
+function beginUploadClick() {
+    if ( state === 'uploading' ) {
+        uploader.stop();
+    } else {
+        uploader.upload();
+    }
+}
 //初始化上传控件
 function initUpload(){
+    //监听分块上传过程中的时间点
+    WebUploader.Uploader.register({
+        "before-send-file":"beforeSendFile",  // 整个文件上传前
+        "before-send":"beforeSend",  // 每个分片上传前
+        //"after-send-file": "afterSendFile"  // 分片上传完毕
+    },{
+        //时间点1：所有分块进行上传之前调用此函数 ，检查文件存不存在
+        beforeSendFile:function(file){
+            var deferred = WebUploader.Deferred();
+            md5File = hex_md5(file.name+file.size);//根据文件名称，大小确定文件唯一标记，这种方式不赞成使用
+            $.ajax({
+                type:"POST",
+                url:"/checkFile",
+                data:{
+                    md5File: md5File, //文件唯一标记
+                    path:$("#text_path").html() + "\\" + file.name //文件全路径
+                },
+                async: false,  // 同步
+                dataType:"json",
+                success:function(response){
+                    if(response){  //文件存在，跳过 ，提示文件存在
+                        $('#' + file.id).find('p.state').text("file exist");
+
+                        var rowIndes = getIndexOrRowsByFileId("dgUpload", file.id, "index");
+                        $('#dgUpload').datagrid('updateRow',{
+                            index: rowIndes,
+                            row: {
+                                uploadState : "文件已存在！"
+                            }
+                        });
+
+                        uploader.skipFile(file);
+                        state = "uploadFail";
+                        deferred.resolve();  //文件不存在或不完整，发送该文件
+                    }else{
+                        var paramOb = {"md5File": md5File, "filedId": file.source.uid};
+                        fileArray.push(paramOb);
+                        deferred.resolve();  //文件不存在或不完整，发送该文件
+                    }
+                }
+            } , function (jqXHR, textStatus, errorThrown) { //任何形式的验证失败，都触发重新上传
+                deferred.resolve();
+            } );
+            return deferred.promise();
+        },
+        //时间点2：如果有分块上传，则每个分块上传之前调用此函数  ，判断分块存不存在
+        beforeSend:function(block){
+            var deferred = WebUploader.Deferred();
+            var pratMd5File;
+            if (fileArray.length > 0) {
+                for (var i = 0; i < fileArray.length; i++) {
+                    if (fileArray[i].filedId == block.file.source.uid) {
+                        pratMd5File = fileArray[i].md5File;
+                        break;
+                    }
+                }
+            }
+            $.ajax({
+                type:"POST",
+                url:"/checkChunk",
+                data:{
+                    md5File: pratMd5File,  //文件唯一标记
+                    chunk:block.chunk,  //当前分块下标
+                    total: block.total, //文件的大小
+                    path:  $("#text_path").html()
+                },
+                async: false,  // 同步
+                dataType:"json",
+                success:function(response){
+                    if(response){
+                        deferred.reject(); //分片存在，跳过
+                    }else{
+                        deferred.resolve();  //分块不存在或不完整，重新发送该分块内容
+                    }
+                }
+            }, function (jqXHR, textStatus, errorThrown) { //任何形式的验证失败，都触发重新上传
+                deferred.resolve();
+            });
+            return deferred.promise();
+        },
+        //时间点3：分片上传完成后，通知后台合成分片
+       /* afterSendFile: function (file) {
+        }*/
+    });
+
      uploader = WebUploader.create({
          // swf文件路径
          swf: 'Uploader.swf',
@@ -336,6 +434,8 @@ function initUpload(){
          pick: '#picker',
          // 不压缩image, 默认如果是jpeg，文件上传前会压缩一把再上传！
          resize: false,
+         //压缩的图片的选项。如果此选项为false, 则图片在上传前不进行压缩
+         compress : false,
          // 是否分块
          chunked:true,
          // 每块文件大小（默认5M）
@@ -361,6 +461,7 @@ function initUpload(){
             remarks : '',
             fileId : file.id
         });
+        uploader.refresh(); // 重新实例化解决 webUploader选择文件按钮无效
     });
     uploader.on( 'all', function( type ) {
         if ( type === 'startUpload' ) {
@@ -372,19 +473,13 @@ function initUpload(){
         }
 
         if ( state === 'uploading' ) {
-            $btn.text('暂停上传！');
+            $('#ctlBtn').text('暂停上传！');
         } else {
-            $btn.text('开始上传');
+            $('#ctlBtn').text('开始上传');
         }
     });
 
-    $btn.on( 'click', function() {
-        if ( state === 'uploading' ) {
-            uploader.stop();
-        } else {
-            uploader.upload();
-        }
-    });
+
 
     //上传添加参数
     uploader.on('uploadBeforeSend', function (obj, data, headers) {
@@ -517,7 +612,46 @@ function saveFile(){
 }
 //打开修改文件的弹框
 function openEditFileDia(){
-
+    var selectrows  = $("#dgFile").datagrid("getChecked");
+    if(selectrows.length == 0){
+        $.messager.alert('提示', '请选择你要修改的文件！', 'info');
+        return;
+    }else if(selectrows.length > 1){
+        $.messager.alert('提示', '只能选择一个你要修改的文件！', 'info');
+        return;
+    }
+    $("#dialog-editFile").dialog('open');
+    $(".panel-tool-close").hide();
+    //$("#remarks").val(selectrows[0].remarks);
+    $("#remarks").textbox('setValue',selectrows[0].remarks);
+}
+//确认保存文件的编辑
+function confirmEdit(){
+    var selectrows  = $("#dgFile").datagrid("getChecked");
+    $.ajax({
+        async : false,
+        cache : false,
+        type : "post",
+        data : {
+            id : selectrows[0].id,
+            remarks :  $("#remarks").val()
+        },
+        url : "/updateFileInfo",
+        dataType : 'json',
+        success : function(data) {
+            if(data.code == 0){
+                $.messager.alert('提示', '文件修改成功！', 'success');
+                query_tabledata(defaultPageSize, defaultPageIndex, getPid());
+                cancelEdit();
+            }else{
+                $.messager.alert('提示', '文件修改失败！', 'error');
+            }
+        }
+    });
+}
+//取消保存文件的编辑
+function cancelEdit(){
+    $("#dialog-editFile").dialog('close');
 }
 
 

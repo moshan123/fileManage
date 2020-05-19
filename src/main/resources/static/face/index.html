@@ -87,21 +87,21 @@
     <p class="lh60" style="padding-left: 5%;">
         <a id="picker" class="easyui-linkbutton btn-warning " >选择文件</a>
 
-        <button id="ctlBtn" class="easyui-linkbutton btn-default">开始上传</button>
+        <button id="ctlBtn" class="easyui-linkbutton btn-default" onclick="beginUploadClick()" >开始上传</button>
         <!--<a id="ctlBtn" class="easyui-linkbutton btn-default" onclick="saveFile()">确定上传</a>-->
     </p>
         <table id = "dgUpload"></table>
 </div>
 <div id="dialog-editFile" class="easyui-dialog" title="修改文件备注" style="width:40%;height:40%;"
-     data-options="resizable:true,modal:true,closed:false">
+     data-options="resizable:true,modal:true,closed:true">
     <div style="higth:100%;width:100% ;" >
         <form id="swich2">
             <ul  class="ft14" style="text-align: center;margin-top: 10%;">
                 <li >备注：&nbsp;
                     <input id="remarks" class="easyui-textbox" data-options="width:250,height:100,multiline:true "/>
                 </li>
-                <li style="margin: 8%"><a class="easyui-linkbutton btn-default" onclick="updateFile()">确定</a>
-                    <a class=" easyui-linkbutton btn-default" onclick="closeEditFileDia()">取消</a>
+                <li style="margin: 8%"><a class="easyui-linkbutton btn-default" onclick="confirmEdit()">确定</a>
+                    <a class=" easyui-linkbutton btn-default" onclick="cancelEdit()">取消</a>
                 </li>
             </ul>
         </form>
@@ -112,90 +112,7 @@
 
 
 $(function () {
-    //监听分块上传过程中的时间点
-    WebUploader.Uploader.register({
-        "before-send-file":"beforeSendFile",  // 整个文件上传前
-        "before-send":"beforeSend",  // 每个分片上传前
-        "after-send-file": "afterSendFile"  // 分片上传完毕
-    },{
-        //时间点1：所有分块进行上传之前调用此函数 ，检查文件存不存在
-        beforeSendFile:function(file){
-            var deferred = WebUploader.Deferred();
-            md5File = hex_md5(file.name+file.size);//根据文件名称，大小确定文件唯一标记，这种方式不赞成使用
-            $.ajax({
-                type:"POST",
-                url:"/checkFile",
-                data:{
-                    md5File: md5File, //文件唯一标记
-                    path:$("#text_path").html() + "\\" + file.name //文件全路径
-                },
-                async: false,  // 同步
-                dataType:"json",
-                success:function(response){
-                    if(response){  //文件存在，跳过 ，提示文件存在
-                        $('#' + file.id).find('p.state').text("file exist");
 
-                        var rowIndes = getIndexOrRowsByFileId("dgUpload", file.id, "index");
-                        $('#dgUpload').datagrid('updateRow',{
-                            index: rowIndes,
-                            row: {
-                                uploadState : "文件已存在！"
-                            }
-                        });
-
-                        uploader.skipFile(file);
-                        state = "uploadFail";
-                        deferred.resolve();  //文件不存在或不完整，发送该文件
-                    }else{
-                        var paramOb = {"md5File": md5File, "filedId": file.source.uid};
-                        fileArray.push(paramOb);
-                        deferred.resolve();  //文件不存在或不完整，发送该文件
-                    }
-                }
-            } , function (jqXHR, textStatus, errorThrown) { //任何形式的验证失败，都触发重新上传
-                deferred.resolve();
-            } );
-            return deferred.promise();
-        },
-        //时间点2：如果有分块上传，则每个分块上传之前调用此函数  ，判断分块存不存在
-        beforeSend:function(block){
-            var deferred = WebUploader.Deferred();
-            var pratMd5File;
-            if (fileArray.length > 0) {
-                for (var i = 0; i < fileArray.length; i++) {
-                    if (fileArray[i].filedId == block.file.source.uid) {
-                        pratMd5File = fileArray[i].md5File;
-                        break;
-                    }
-                }
-            }
-            $.ajax({
-                type:"POST",
-                url:"/checkChunk",
-                data:{
-                    md5File: pratMd5File,  //文件唯一标记
-                    chunk:block.chunk,  //当前分块下标
-                    total: block.total, //文件的大小
-                    path:  $("#text_path").html()
-                },
-                async: false,  // 同步
-                dataType:"json",
-                success:function(response){
-                    if(response){
-                        deferred.reject(); //分片存在，跳过
-                    }else{
-                        deferred.resolve();  //分块不存在或不完整，重新发送该分块内容
-                    }
-                }
-            }, function (jqXHR, textStatus, errorThrown) { //任何形式的验证失败，都触发重新上传
-                deferred.resolve();
-            });
-            return deferred.promise();
-        },
-        //时间点3：分片上传完成后，通知后台合成分片
-        afterSendFile: function (file) {
-        }
-    });
     $("#name").textbox({
         width:170,
         height:30,
@@ -218,7 +135,6 @@ $(function () {
         editable : false,
         prompt : '请输选择文件类型',
         data : [
-                {"typeCode":"tp_folder","typeName":"文件夹"},
                 {"typeCode":"tp_picture","typeName":"图片"},
                 {"typeCode":"tp_video","typeName":"视频"},
                 {"typeCode":"tp_document","typeName":"文档"},

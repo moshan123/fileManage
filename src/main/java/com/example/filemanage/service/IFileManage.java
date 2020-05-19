@@ -42,7 +42,7 @@ public interface IFileManage {
      * 批量新增
      * @param map
      */
-    void insertFileInfo(Map<String , Object> map);
+    void insertFileInfo(Map<String , Object> map) throws Exception;
 
     /**
      * 批量修改
