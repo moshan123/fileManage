@@ -4,6 +4,7 @@ import cn.hutool.core.io.FileUtil;
 import cn.hutool.http.HttpUtil;
 import com.example.filemanage.dao.FileManageDao;
 import com.example.filemanage.service.IFileManage;
+import com.example.filemanage.util.DownloadThread;
 import com.example.filemanage.util.R;
 import com.example.filemanage.util.page.ChangePage;
 import org.apache.commons.fileupload.FileItem;
@@ -25,8 +26,7 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.*;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
+import java.net.*;
 import java.nio.channels.FileChannel;
 import java.util.*;
 
@@ -34,6 +34,8 @@ import java.util.*;
 @RestController
 public class FileMangeController  {
     private  static  final Logger log = LoggerFactory.getLogger(FileMangeController.class);
+    public static final int THREAD_COUNT = 3; // 开启的线程的个数
+    public static int runningThread = 3;// 记录正在运行的下载文件的线程数
 
     @Qualifier("ifileManage")
     @Autowired
@@ -98,10 +100,11 @@ public class FileMangeController  {
      * @param map
      */
     @RequestMapping( value = "openLocalFile")
-    public R openLocalFile(HttpServletRequest request, @RequestParam Map<String , Object> map) throws UnknownHostException {
+    public R openLocalFile(HttpServletRequest request, @RequestParam Map<String , Object> map) throws IOException {
         String id = getIpAddress(request);
+        File file = new File(map.get("filePath").toString());
         if("127.0.0.1".equals(id.toString())){
-            File file = new File(map.get("filePath").toString());
+
             if (!file.exists()) {
                 return  R.error().put("msg","该盘符或文件不在您的电脑上！");
             }
@@ -116,7 +119,40 @@ public class FileMangeController  {
                 return  R.error().put("msg","该盘符或文件不在您的电脑上！");
             }
         }else{
-            return  R.error().put("msg","该盘符或文件不在您的电脑上！");
+            if(file.isDirectory()){
+                return  R.error().put("msg","该盘符或文件不在您的电脑上！");
+            }
+            //下载文件
+            try{
+                    // 服务器返回的数据的长度，实际就是文件的长度
+                    int length = (int) map.get("fileSize")*1024*1024;
+                    log.info("----文件总长度----" + length);
+                    // 在客户端本地创建出来一个大小跟服务器端文件一样大小的临时文件
+                    String fileName = map.get("filePath").toString().substring(map.get("filePath").toString().lastIndexOf("/"));
+                    RandomAccessFile raf = new RandomAccessFile(fileName, "rwd");
+                    // 指定创建的这个文件的长度
+                    raf.setLength(length);
+                    // 关闭raf
+                    raf.close();
+                    // 假设是3个线程去下载资源
+                    // 平均每一个线程下载的文件的大小
+                    int blockSize = length / THREAD_COUNT;
+                    for (int threadId = 1; threadId <= THREAD_COUNT; threadId++) {
+                        // 第一个线程开始下载的位置
+                        int startIndex = (threadId - 1) * blockSize;
+                        int endIndex = threadId * blockSize - 1;
+                        if (threadId == THREAD_COUNT) {
+                            endIndex = length;
+                        }
+                        log.info("----threadId---" + "--startIndex--"
+                                + startIndex + "--endIndex--" + endIndex);
+                        new DownloadThread(map.get("filePath").toString(), threadId, startIndex, endIndex,fileName)
+                                .start();
+                    }
+
+            }catch (Exception e){
+                return  R.error().put("msg","文件下载失败！");
+            }
         }
         return R.ok();
 
@@ -392,5 +428,6 @@ public class FileMangeController  {
         }
         return true;
     }
+
 
 }

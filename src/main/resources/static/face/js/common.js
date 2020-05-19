@@ -49,13 +49,23 @@ function openLocalFile2(filename){
     }
 }
 //调用后台java代码打开文件
-function openLocalFile(path){
+function openLocalFile(path,type,size){
+    var data;
+    if(type == 'folder'){
+        data = {filePath : path}
+    }else if(type == "file"){
+        data = {
+            filePath : path,
+            fileSize : size
+        }
+    }
+
     $.ajax({
         url : "/openLocalFile",
         type : "post",
         dataType : 'json',
         async : true,
-        data : {filePath : path},
+        data : data,
         success : function(data) {
             if(data.code != 0){
                 $.messager.alert('提示', data.msg, 'info');
@@ -79,7 +89,8 @@ function getParent(target){
 
 function  getDg_Path(index){
    var path = $("#dgFile").datagrid('getRows')[index]["path"];
-    openLocalFile(path);
+   var size = $("#dgFile").datagrid('getRows')[index]["fileSize"];
+    openLocalFile(path,"file", size);
 }
 
 //时间格式 2019-08-01 09:55:26

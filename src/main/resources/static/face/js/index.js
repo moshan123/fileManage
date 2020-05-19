@@ -96,7 +96,7 @@ function initTree(){
             } else {
                 $("#text_path").text( getPath());
             }
-            $("#text_path").attr("onclick","openLocalFile( $(\"#text_path\").text())");
+            $("#text_path").attr("onclick","openLocalFile( $(\"#text_path\").text(),'folder','')");
             initFileDatagrid(node.id);
         }
     });
@@ -158,7 +158,7 @@ function openFolderDia(type){
 //关闭 新增文件夹 的弹框
 function closeFolderDia(){
     $("#dialog-addFolder").dialog('close');
-    //清楚内容
+    //清除内容
     $("#swich").form("reset");
 }
 //修改文件
@@ -323,7 +323,7 @@ function openFileDia(type){
     }else if(type == 'upd'){
         $("#dialog-file").dialog('open');
     }
-    $(".panel-tool-close").attr("onclick",gotoPage('dgFile', tableData, query_tabledata));
+    //$(".panel-tool-close").attr("onclick",gotoPage('dgFile', tableData, query_tabledata));
     state = 'pending';
     fileArray = [];
 
@@ -621,7 +621,7 @@ function openEditFileDia(){
         return;
     }
     $("#dialog-editFile").dialog('open');
-    $(".panel-tool-close").hide();
+    //$(".panel-tool-close").hide();
     //$("#remarks").val(selectrows[0].remarks);
     $("#remarks").textbox('setValue',selectrows[0].remarks);
 }
@@ -653,5 +653,12 @@ function confirmEdit(){
 function cancelEdit(){
     $("#dialog-editFile").dialog('close');
 }
-
+//关闭新增问价的弹框
+function closeDiaFile(){
+    gotoPage('dgFile', tableData, query_tabledata);
+}
+//关闭新增文件夹的弹框
+function closeAddFolder() {
+    $("#swich").form("reset");
+}
 

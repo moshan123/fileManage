@@ -65,7 +65,7 @@
     </div>
 </div>
 <div id="dialog-addFolder" class="easyui-dialog" title="新增文件夹" style="width:50%;height:58%;"
-     data-options="resizable:true,modal:true,closed:true">
+     data-options="resizable:true,modal:true,closed:true,onClose:closeAddFolder">
     <div style="higth:100%;width:100% ;" >
         <form id="swich">
             <ul id="sp" class="ft14" style="text-align: center;">
@@ -83,7 +83,7 @@
     </div>
 </div>
 <div id="dialog-file" class="easyui-dialog" title="维护文件" style="width:95%;height:75%;"
-     data-options="resizable:true,modal:true,closed:true">
+     data-options="resizable:true,modal:true,closed:true,onClose:closeDiaFile">
     <p class="lh60" style="padding-left: 5%;">
         <a id="picker" class="easyui-linkbutton btn-warning " >选择文件</a>
 
