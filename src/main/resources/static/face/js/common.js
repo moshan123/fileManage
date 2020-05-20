@@ -49,23 +49,16 @@ function openLocalFile2(filename){
     }
 }
 //调用后台java代码打开文件
-function openLocalFile(path,type,size){
+function openLocalFile(path,type){
     var data;
-    if(type == 'folder'){
-        data = {filePath : path}
-    }else if(type == "file"){
-        data = {
-            filePath : path,
-            fileSize : size
-        }
-    }
+
 
     $.ajax({
         url : "/openLocalFile",
         type : "post",
         dataType : 'json',
         async : true,
-        data : data,
+        data : {filePath : path},
         success : function(data) {
             if(data.code != 0){
                 $.messager.alert('提示', data.msg, 'info');

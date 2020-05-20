@@ -16,6 +16,7 @@ import org.springframework.web.multipart.support.StandardMultipartHttpServletReq
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.*;
+import java.net.URLEncoder;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
@@ -28,7 +29,7 @@ public class FileManageImpl implements IFileManage {
     FileManageDao dao;
 
     @Override
-    public List<Map<String, Object>> queryInfo(Map<String , Object> map) {
+    public List<Map<String, Object>> queryInfo(Map<String, Object> map) {
         return dao.queryInfo(map);
     }
 
@@ -44,22 +45,23 @@ public class FileManageImpl implements IFileManage {
 
     @Override
     @Transactional(readOnly = false)
-    public void deleteByPrimaryKey(Map<String , Object> map) throws Exception {
+    public void deleteByPrimaryKey(Map<String, Object> map) throws Exception {
         String[] ids = map.get("ids").toString().split(",");
-        if("folder".equals(map.get("flag"))){
+        if ("folder".equals(map.get("flag"))) {
             dao.deleteChildren(ids.toString());
             //删除物理文件
             File file = new File(map.get("path").toString());
-            if(file.exists()){
+            if (file.exists()) {
                 FileUtil.delete(map.get("path").toString());
             }
-        }else{
-            ArrayList<String> paths  =
-                    JSON.parseObject((String) map.get("paths"), new TypeReference<ArrayList<String>>(){});
-            for (int i =0; i < paths.size(); i++ ){
+        } else {
+            ArrayList<String> paths =
+                    JSON.parseObject((String) map.get("paths"), new TypeReference<ArrayList<String>>() {
+                    });
+            for (int i = 0; i < paths.size(); i++) {
                 //删除物理文件
                 File file = new File(paths.get(i));
-                if(!file.exists()){
+                if (!file.exists()) {
                     throw new Exception("未找到文件！");
                 }
                 cn.hutool.core.io.FileUtil.del(paths.get(i));
@@ -72,47 +74,47 @@ public class FileManageImpl implements IFileManage {
 
     @Override
     @Transactional(readOnly = false)
-    public void insertFileInfo(Map<String , Object> map) throws Exception {
+    public void insertFileInfo(Map<String, Object> map) throws Exception {
         List<Map<String, Object>> list = new ArrayList<Map<String, Object>>();
-        if("folder".equals(map.get("flag"))){
-            if(map.get("rootNodePath") != null &&  map.get("rootNodePath") != ""){
+        if ("folder".equals(map.get("flag"))) {
+            if (map.get("rootNodePath") != null && map.get("rootNodePath") != "") {
                 String path = map.get("path").toString();
                 int index = path.indexOf("\\");
-                index = path.indexOf("\\", index+1);
+                index = path.indexOf("\\", index + 1);
                 map.put("path", path.substring(index));
             }
             map.put("id", FileUtil.newUUID());
-            map.put("createTime" ,new Date());
+            map.put("createTime", new Date());
             map.put("remarks", "");
-            map.put("fileSize","");
+            map.put("fileSize", "");
             list.add(map);
         } else {
-            String rows = (String)map.get("rows");
+            String rows = (String) map.get("rows");
             JSONArray jsonArray = JSONArray.parseArray(rows);
             Object[] obj = jsonArray.toArray();
-            for (int i = 0; i < obj.length; i++){
-                Map<String, Object> addRow = (Map<String, Object>)obj[i];
+            for (int i = 0; i < obj.length; i++) {
+                Map<String, Object> addRow = (Map<String, Object>) obj[i];
                 String path = addRow.get("path").toString();
-                int index=path.indexOf("\\");
-                index=path.indexOf("\\", index+1);
-                addRow.put("path",path.substring(index));
+                int index = path.indexOf("\\");
+                index = path.indexOf("\\", index + 1);
+                addRow.put("path", path.substring(index));
                 addRow.put("id", FileUtil.newUUID());
                 list.add(addRow);
             }
         }
         dao.insertFileInfo(list);
         //创建文件夹
-        if("folder".equals(map.get("flag"))){
+        if ("folder".equals(map.get("flag"))) {
             File file = new File(map.get("rootNodePath").toString());
-            if(!file.exists()  && !file .isDirectory()){
-                throw new Exception(map.get("rootNodePath").toString()+"文件夹不存在！");
+            if (!file.exists() && !file.isDirectory()) {
+                throw new Exception(map.get("rootNodePath").toString() + "文件夹不存在！");
             }
             File fileChiled = new File(map.get("rootNodePath").toString() + map.get("path").toString());
-            if  (fileChiled .exists()  && fileChiled .isDirectory()) {
-                throw new Exception(map.get("rootNodePath").toString() + map.get("path").toString()+
+            if (fileChiled.exists() && fileChiled.isDirectory()) {
+                throw new Exception(map.get("rootNodePath").toString() + map.get("path").toString() +
                         "当前文件夹已存在！");
             }
-                FileUtil.createFolder(map.get("rootNodePath").toString() + map.get("path").toString());
+            FileUtil.createFolder(map.get("rootNodePath").toString() + map.get("path").toString());
 
 
         }
@@ -120,56 +122,118 @@ public class FileManageImpl implements IFileManage {
 
     @Override
     @Transactional(readOnly = false)
-    public void updateFileInfo(Map<String , Object> map) {
+    public void updateFileInfo(Map<String, Object> map) {
 
 
-        if("folder".equals(map.get("flag"))){
+        if ("folder".equals(map.get("flag"))) {
 
         } else {
 
         }
         dao.updateFileInfo(map);
     }
-    public String pictureName=null ;
-    public String picturePath=null ;
+
+    public String pictureName = null;
+    public String picturePath = null;
+
     @Override
     public void upload(HttpServletRequest request) throws IOException {
-            //获取文件需要上传到的路径
-            picturePath = request.getParameter("path").toString();
-            // 判断存放上传文件的目录是否存在（不存在则创建）
-            File dir = new File(picturePath);
-            if (!dir.exists()) {
-                dir.mkdir();
+        //获取文件需要上传到的路径
+        picturePath = request.getParameter("path").toString();
+        // 判断存放上传文件的目录是否存在（不存在则创建）
+        File dir = new File(picturePath);
+        if (!dir.exists()) {
+            dir.mkdir();
+        }
+        StandardMultipartHttpServletRequest req = (StandardMultipartHttpServletRequest) request;
+        //获取formdata的值
+        Iterator<String> iterator = req.getFileNames();
+        while (iterator.hasNext()) {
+            MultipartFile file = req.getFile(iterator.next());
+            //将文件信息存入数据库中
+            pictureName = file.getOriginalFilename();
+            File file1 = new File(picturePath + File.separator + pictureName);
+            OutputStream out = null;
+            try {
+                out = new FileOutputStream(file1);
+                out.write(file.getBytes());
+            } finally {
+                out.close();
             }
-            StandardMultipartHttpServletRequest req = (StandardMultipartHttpServletRequest) request;
-            //获取formdata的值
-            Iterator<String> iterator = req.getFileNames();
-            while (iterator.hasNext()) {
-                MultipartFile file = req.getFile(iterator.next());
-                //将文件信息存入数据库中
-                pictureName = file.getOriginalFilename();
-                File file1 = new File(picturePath + File.separator + pictureName);
-                OutputStream out = null;
-                try {
-                    out = new FileOutputStream(file1);
-                    out.write(file.getBytes());
-                } finally {
-                    out.close();
-                }
-            }
+        }
     }
 
     @Override
-    public void download(HttpServletResponse response) {
-        File file = new File(picturePath+pictureName);
-        if (pictureName != null) {
+    public void download(HttpServletResponse response, HttpServletRequest request, Map<String, Object> map) throws UnsupportedEncodingException {
+
+        File file = new File(map.get("filePath").toString());
+        if (!file.exists()) {
+            // file = new File(rootPath + queryOne.get("filePath")+File.separator+queryOne.get("id"));
+        }
+        // 以附件的形式相应给客户端,并解决中文乱码问题
+        String name = null;
+        String realname = map.get("filePath").toString().substring(map.get("filePath").toString().lastIndexOf("\\") + 1);
+        if (request.getHeader("User-Agent").toUpperCase().indexOf("MSIE") > 0) {
+            name = URLEncoder.encode(realname, "UTF-8");
+            name = name.replaceAll("\\+", "%20");
+        } else {
+            String i = realname;
+            name = new String(i.getBytes("UTF-8"), "ISO8859-1");
+        }
+        response.setHeader("content-disposition", "attachment;filename=" + name);
+        response.setContentType("application/force-download");
+        byte[] bytes = new byte[1024];
+        FileInputStream inputStream = null;
+        BufferedInputStream bufferedInputStream = null;
+        try {
+            //先将文件输入流拿出来
+            inputStream = new FileInputStream(file);
+            //放到缓冲区
+            bufferedInputStream = new BufferedInputStream(inputStream);
+            //输出流
+            OutputStream outputStream = response.getOutputStream();
+            int i = bufferedInputStream.read(bytes);
+            //每次只读1024个字节，读完i是-1
+            while (i != -1) {
+                //每次写1024个字节，从0个开始写到i个结束
+                outputStream.write(bytes, 0, i);
+                outputStream.flush();
+                //i从缓冲区继续读字节
+                i = bufferedInputStream.read(bytes);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+
+            if (bufferedInputStream != null) {
+                try {
+                    bufferedInputStream.close();
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                }
+            }
+            if (inputStream != null) {
+                try {
+                    inputStream.close();
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                }
+            }
+        }
+    }
+
+
+
+
+        /*File file = new File(map.get("filePath").toString());
             if (file.exists()) {
                 response.setContentType("application/force-download");// 设置强制下载不打开
                 Date currentTime = new Date();
                 SimpleDateFormat dateFormat = new SimpleDateFormat("yyyyMMddHHmmss");
                 String dataTime=dateFormat.format(currentTime);
                 //文件重新命名
-                String pictureNewName = dataTime+pictureName.substring(pictureName.indexOf("."));
+                String pictureNewName = map.get("filePath").toString().substring(map.get("filePath").toString().lastIndexOf("\\")+1);
+                //String pictureNewName = dataTime+pictureName.substring(pictureName.indexOf("."));
                 response.addHeader("Content-Disposition",
                         "attachment;fileName=" + pictureNewName);// 设置文件名
                 byte[] buffer = new byte[1024];
@@ -204,9 +268,9 @@ public class FileManageImpl implements IFileManage {
                         }
                     }
                 }
-            }
-        }
-    }
+            }*/
+
+
 
 
 

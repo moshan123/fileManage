@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.util.List;
 import java.util.Map;
 @Service
@@ -60,5 +61,5 @@ public interface IFileManage {
      * 下载文件
      * @param response
      */
-    void download(HttpServletResponse response);
+    void download(HttpServletResponse response, HttpServletRequest request,Map<String, Object> map) throws UnsupportedEncodingException;
 }
