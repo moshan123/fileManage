@@ -61,5 +61,5 @@ public interface IFileManage {
      * 下载文件
      * @param response
      */
-    void download(HttpServletResponse response, HttpServletRequest request,Map<String, Object> map) throws UnsupportedEncodingException;
+    void download(HttpServletResponse response, HttpServletRequest request, Map<String, Object> map) throws UnsupportedEncodingException;
 }

@@ -50,9 +50,6 @@ function openLocalFile2(filename){
 }
 //调用后台java代码打开文件
 function openLocalFile(path,type){
-    var data;
-
-
     $.ajax({
         url : "/openLocalFile",
         type : "post",
@@ -83,7 +80,36 @@ function getParent(target){
 function  getDg_Path(index){
    var path = $("#dgFile").datagrid('getRows')[index]["path"];
    var size = $("#dgFile").datagrid('getRows')[index]["fileSize"];
-    openLocalFile(path,"file", size);
+    //是本地就调用
+    var flag = isLocal();
+    if(flag){
+       openLocalFile(path,"file", size);
+    }else{
+        //动态创建表单加到fbody中，最后删除表单
+        var exportForm = $("<form action='/download' method='post'></form>");
+        exportForm.append("<input type='hidden' name='filePath' value='"+path+"'/>");
+        $(document.body).append(exportForm);
+        exportForm.submit();
+        exportForm.remove();
+    }
+}
+//判断是否是服务器本地
+function isLocal(){
+    var flag =false;
+    $.ajax({
+        url : "/isLocal",
+        type : "post",
+        dataType : 'json',
+        async : false,
+        success : function(data) {
+            if(data.code == 0){
+                flag = true;
+            } else {
+                flag = false;
+            }
+        }
+    });
+    return flag;
 }
 
 //时间格式 2019-08-01 09:55:26

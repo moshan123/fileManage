@@ -164,7 +164,7 @@ public class FileManageImpl implements IFileManage {
     }
 
     @Override
-    public void download(HttpServletResponse response, HttpServletRequest request, Map<String, Object> map) throws UnsupportedEncodingException {
+    public void download(HttpServletResponse response,HttpServletRequest request, Map<String, Object> map) throws UnsupportedEncodingException {
 
         File file = new File(map.get("filePath").toString());
         if (!file.exists()) {
@@ -204,7 +204,6 @@ public class FileManageImpl implements IFileManage {
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
-
             if (bufferedInputStream != null) {
                 try {
                     bufferedInputStream.close();

@@ -1,15 +1,16 @@
-package com.example.filemanage;
+package com.example.filemanage.controller;
 
 import com.example.filemanage.service.IFileManage;
 import com.example.filemanage.util.R;
 import com.example.filemanage.util.page.ChangePage;
 import org.apache.commons.io.FileUtils;
-import org.junit.jupiter.api.Test;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.boot.test.context.SpringBootTest;
+
+import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -18,28 +19,13 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-@SpringBootTest
-class FilemanageApplicationTests {
-
-    @Test
-    void contextLoads() throws IOException {
-        String path = "http://down.360safe.com/yunpan/360wangpan_setup.exe";
-        // 1、连接服务器，获取一个文件，获取文件的长度，在本地创建一个大小跟服务器文件大小一样的临时文件
-        URL url = new URL(path);
-        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        conn.setConnectTimeout(5000);
-        conn.setRequestMethod("GET");
-        int code = conn.getResponseCode();
-        int length = conn.getContentLength();//单位是b
-        int a =0;
-    }
-
-    @RestController
-    public static class FileMangeController  {
-        private  static  final Logger log = LoggerFactory.getLogger(FileMangeController.class);
+@RestController
+public  class FileManageController  {
+        private  static  final Logger log = LoggerFactory.getLogger(FileManageController.class);
         public static final int THREAD_COUNT = 3; // 开启的线程的个数
         public static int runningThread = 3;// 记录正在运行的下载文件的线程数
 
@@ -99,6 +85,22 @@ class FilemanageApplicationTests {
         public List<Map<String, Object>> queryFolderList(@RequestParam Map<String , Object> map){
             List<Map<String, Object>> listInfo = ifileManage.queryFolderList(map.get("pId").toString());
             return listInfo;
+        }
+
+        @RequestMapping( value = "isLocal")
+        public R isLocal(HttpServletRequest request){
+            try{
+                String id = getIpAddress(request);
+                if("127.0.0.1".equals(id.toString())){
+                    return R.ok();
+                }else{
+                    return R.error();
+                }
+            }catch (Exception e){
+                log.info("获取失败");
+                e.printStackTrace();
+                return  R.error(e.getMessage());
+            }
         }
 
         /**
@@ -259,13 +261,15 @@ class FilemanageApplicationTests {
          * @param response
          */
         @RequestMapping("/download")
-        public void download( HttpServletResponse response){
-           /* try {
-                ifileManage.download(response);
+        public void download( HttpServletResponse response, HttpServletRequest request, String filePath){
+            try {
+                Map<String, Object> map = new HashMap<String, Object>();
+                map.put("filePath", filePath);
+                ifileManage.download(response,request,map);
             }catch (Exception e){
                 e.printStackTrace();
                 log.error("下载失败！");
-            }*/
+            }
 
         }
 
@@ -470,4 +474,4 @@ class FilemanageApplicationTests {
 
 
     }
-}
+
